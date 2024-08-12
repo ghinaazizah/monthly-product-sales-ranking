@@ -1,0 +1,36 @@
+1. BigQuery scripting syntax
+ BEGIN dan END: Scripting syntax  digunakan untuk menjalan lebih dari satu query, dalam hal ini terdapat dua query utama yaitu terkait pembuatan temporary table data perjualan bulanan per produk dan query untuk mendapatkan data penjualan produk tertinggi tiap bulannya.
+
+2. Query untuk membuat temporary table terkait data penjualan bulanan per produk
+a. CREATE TEMP TABLE report_monthly_orders_product_agg AS: Query ini digunakan untuk membuat tabel yang sifatnya sementara karena hanya ada saat sesi query ini dieksekusi. Tabel sementara ini diberi nama “report_monthly_orders_product_agg”.
+
+b. CTE (Common Table Expression) untuk tabel “monthly_sales”
+WITH monthly_sales AS (…): Dengan syntax WITH … AS (…) berarti kita menggunakan CTE yang dalam hal ini berfungsi untuk membuat tabel sementara bernama “monthly_sales”. 
+SELECT EXTRACT(YEAR FROM o.created_at) AS year, EXTRACT(MONTH FROM o.created_at) AS month, oi.product_id, p.name AS product_name, SUM(oi.sale_price) AS total_sales: Dalam syntax Select ini terdapat lima hal yang diambil, berikut penjelasannya:
+• Query untuk mengekstrak tahun dari “o.created_at” (kolom “created_at” pada tabel “orders”) kemudian kolom tersebut diberi alias yaitu “year”. 
+• Query untuk mengekstrak bulan dari “o.created_at” (kolom “created_at” pada tabel “orders”) kemudian kolom tersebut diberi alias yaitu “month”.
+• Query untuk mengambil kolom “oi.product_id” (kolom “product_id” pada tabel “order_items”).
+• Query untuk mengambil kolom “oi.product_id” (kolom “product_name” pada tabel “order_ items”) kemudian kolom tersebut diberi alias yaitu “product_name”.
+• Query untuk menjumlahkan “oi.sale_price” (kolom “sale_price” pada tabel “order_ items”) kemudian kolom tersebut diberi alias yaitu “total_sales”.
+
+FROM `bigquery-public-data.thelook_ecommerce.orders` o: Query yang mengakses data dari tabel “orders” dalam dataset “thelook_ecommerce” bagian dari “bigquery-public-data”. Data yang diambil ini diberi alias “o”.
+
+JOIN `bigquery-public-data.thelook_ecommerce.order_items` oi ON o.order_id = oi.order_id  JOIN `bigquery-public-data.thelook_ecommerce.products` p ON oi.product_id = p.id: : Query untuk menggabungkan 3 tabel (“orders”, “order_items”, dan “products”) yang ada dalam dataset “thelook_ecommerce” bagian dari “bigquery-publlic-data” dengan pemberian alias yaitu data dari tabel “orders” dijuluki “o”, data tabel  “order_items” dijuluki “oi”, dan data tabel  “products” dijuluki “p”. Penggabungan tiga tabel ini didasarkan pada foreign key yang relevan (kolom penghubung atau yang sama dengan kolom di tabel lain) yaitu untuk tabel “orders” dengan “order_items” berdasarkan kolom “order_id” dan “order_items” dengan “products” berdasarkan kolom “product_id”.
+
+GROUP BY year, month, oi.product_id, p.name):  Query untuk mengelompokkan data berdasarkan kolom “year”, “month”, “oi.product_id” (kolom “product_id” dari tabel “order_items”), “p.name” (kolom “name” dari “tabel product”).
+
+c.CTE tabel ranked_sales 
+, ranked_sales AS (…): diawali dengan tanda koma yang sebelumnya ada syntax WITH yang berarti query ini juga merupakan CTE. CTE ini digunakan untuk membuat tabel sementara bernama “ranked_sales”.
+
+SELECT year, month, product_id, product_name, total_sales, RANK() OVER (PARTITION BY year, month ORDER BY total_sales DESC) AS rank: dalam query ini terdapat enam hal yang diambil sebagai kolom yaitu “year”, “month”, “product_id”, “product_name”, “total_sales”, dan untuk kolom yang keenam berikut penjelasan lebih rincinya: RANK() digunakan untuk memberikan peringkat pada produk berdasarkan penjualan tertinggi setiap bulan, OVER digunakan untuk menentukan bagaimana proses rangking dilakukan. PARTITION BY mengelompokkan data berdasarkan kolom “year” dan “month”, kemudian ORDER BY “total_sales” berarti syntax untuk mengelompokkan data berdasarkan kolom “total_sales” dan syntax DESC berarti perintah untuk mengurutkan  dari tertinggi ke yang terendah. Jadi kesimpulannya untuk kolom keenam yang diambil adalah rangking total penjualan per bulan tiap tahunnya dari yang penjualannya tertinggi ke yang terrendah yang dijuluki dengan nama kolom “rank”.
+
+FROM  monthly_sales): Query yang mengambil data dari “tabel monthly_sales” yang dibuat di CTE sebelumnya.
+
+3. Query untuk mendapatkan data produk yang penjualannya tertinggi setiap bulan
+SELECT year, month, product_id, product_name, total_sales: Query untuk memilih kolom “year”, “month”, “product_id”, “product_name”, dan “total_sales”.
+
+FROM ranked_sales: Query yang mengambil data dari tabel “ranked_sales”.
+
+WHERE rank = 1: Query yang menyaring data dengan ketentuan “rank” nya harus 1 yaitu berarti hanya untuk produk dengan penjualan tertinggi.
+
+ORDER BY year, month; : Hasil akhirnya diurutkan berdasarkan kolom “year” dan “month” dari terlama ke yang terbaru karena secara default diurutkan secara ASC.
